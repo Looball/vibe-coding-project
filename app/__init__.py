@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -9,6 +10,8 @@ from app.api import api_router
 from app.core.config import settings
 
 FRONTEND_DIR = Path(__file__).resolve().parents[1] / "frontend"
+# 默认前后端分离：后端只提供 API。如需后端代托管前端，设 VIBEQA_SERVE_FRONTEND=1
+SERVE_FRONTEND = os.environ.get("VIBEQA_SERVE_FRONTEND", "").lower() in ("1", "true", "yes")
 
 
 def create_app() -> FastAPI:
@@ -22,7 +25,7 @@ def create_app() -> FastAPI:
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=["*"],  # 前后端分离后允许跨域
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -30,11 +33,12 @@ def create_app() -> FastAPI:
 
     app.include_router(api_router, prefix="/api/v1")
 
-    # 前端静态资源与首页（PRD 3.x）
-    app.mount("/static", StaticFiles(directory=FRONTEND_DIR / "static"), name="static")
+    # 仅当显式开启时由后端托管前端静态资源（单命令演示用）
+    if SERVE_FRONTEND and (FRONTEND_DIR / "static").is_dir():
+        app.mount("/static", StaticFiles(directory=FRONTEND_DIR / "static"), name="static")
 
-    @app.get("/", include_in_schema=False)
-    async def index() -> FileResponse:
-        return FileResponse(FRONTEND_DIR / "index.html")
+        @app.get("/", include_in_schema=False)
+        async def index() -> FileResponse:
+            return FileResponse(FRONTEND_DIR / "index.html")
 
     return app

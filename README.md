@@ -47,9 +47,18 @@ uv run python -m app.services.ingestion --dir documents/data/ai_data --subject a
 ### 4. 启动
 
 ```bash
+# 后端 API（前后端分离，后端只提供 /api/v1）
 uv run uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 # 交互文档: http://localhost:8000/docs
-# 前端页面: http://localhost:8000/  （frontend/，原生 SPA：学科选择/会话/即时+流式问答）
+
+# 前端（独立静态服务，默认指向 http://localhost:8000）
+uv run python -m http.server 8080 -d frontend
+# 页面: http://localhost:8080
+# 改后端地址: 编辑 frontend/index.html 里 window.__VIBEQA__.api
+
+# 可选：单进程一键模式（后端代托管前端）
+VIBEQA_SERVE_FRONTEND=1 uv run uvicorn main:app --port 8000
+# 页面与文档都在 http://localhost:8000
 ```
 
 ## API

@@ -3,6 +3,9 @@
  */
 "use strict";
 
+// 前后端分离：API 地址来自 index.html 注入的 window.__VIBEQA__.api
+const API_ORIGIN = (window.__VIBEQA__ && window.__VIBEQA__.api) || "http://localhost:8000";
+
 const $ = (s) => document.querySelector(s);
 const state = {
   subject: null,
@@ -14,7 +17,7 @@ const state = {
 /* ---------------- 工具 ---------------- */
 
 async function api(path, options = {}) {
-  const res = await fetch(path, {
+  const res = await fetch(API_ORIGIN + path, {
     headers: { "Content-Type": "application/json" },
     ...options,
   });
@@ -232,7 +235,7 @@ async function streamAsk(q) {
     messagesBox.scrollTop = messagesBox.scrollHeight;
   };
 
-  const resp = await fetch("/api/v1/chat/stream", {
+  const resp = await fetch(API_ORIGIN + "/api/v1/chat/stream", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ query: q, subject: state.subject }),
