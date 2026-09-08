@@ -22,12 +22,19 @@ dependencies = [
     "tiktoken>=0.14.0",
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
     "pytest>=8.0.0",
-    "pytest-asyncio>=0.23.0",
     "ruff>=0.3.0",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "integration: 需要本地服务(MySQL/Redis/Milvus)的测试，默认跳过，用 -m integration 运行",
+]
+# 默认只跑离线单元测试；加 -m integration 时命令行 -m 覆盖此 addopts
+addopts = "-m 'not integration'"
 
 [tool.ruff]
 line-length = 100

@@ -7,7 +7,7 @@
 - 仓库根目录：`/Users/bing/Desktop/Github/vibe-coding`
 - 标准启动路径：`./init.sh`（uv sync → 语法/导入/配置自检）；运行时依赖 docker 服务：MySQL:3306、Redis:6379、Milvus:19530（拉起见 `CLAUDE.md`）
 - 标准验证路径：`./init.sh` + 功能烟测 `uv run python ...`（详见 `CLAUDE.md` Verification Commands）
-- 当前最高优先级未完成功能：`feat-007` Verification & Docs（见 `feature_list.json`）
+- 当前最高优先级未完成功能：无（feat-001~007 已全部完成；后续为新增需求/前端等扩展）
 - 当前 blocker：无硬阻塞。注意——在线嵌入/LLM 按量计费；宿主 `python3`(3.14) ≠ 项目 `.venv`(3.12)，命令统一 `uv run python`
 
 ## 会话记录
@@ -94,3 +94,21 @@
 - 更新过的文件或工件：`app/api/{__init__,schemas,chat,conversations,meta}.py`、`app/__init__.py`、`feature_list.json`（feat-006 completed）、`progress.md`
 - 已知风险或未解决问题：SSE 事件名约定 `sources/message/done`，前端需按此消费；会话无鉴权/多用户隔离（单机单用户，后续可加）
 - 下一步最佳动作：提交 feat-006 变更；随后开工 `feat-007` Verification & Docs——补 pytest（client/chunker/接口），写 README 与运行说明，确认 `./init.sh` 干净重启
+
+### Session 006
+
+- 日期：2026-09-08
+- 本轮目标：feat-006 收尾提交 + feat-007 测试与文档
+- 已完成：
+  - 提交 feat-006（`e8a0383`）
+  - 测试基建：dev 依赖改 `[dependency-groups]`（`uv sync` 默认装）；pytest 配置 `testpaths` + `integration` marker，默认 `addopts -m not integration` 只跑离线单测
+  - 单测 `tests/{test_chunker,test_greeting,test_config,test_schemas}.py`（离线）
+  - 集成测试 `tests/test_api_integration.py`（`-m integration`，需本地服务）
+  - `README.md`：目录结构、快速开始、API 表、RAG 链路、测试与验证
+  - 验证 `./init.sh` 干净重启（含 pytest 单元）
+- 运行过的验证：`uv run python -m pytest` → 21 passed / 3 deselected；`-m integration` → 3 passed；`./init.sh` 全绿（compileall/import/pytest 21/config 自检/三服务 UP）
+- 已记录证据：以上 pytest 与 init.sh 输出
+- 提交记录：`e8a0383` feat: feat-006 REST API 与会话管理（feat-007 变更尚未提交）
+- 更新过的文件或工件：`pyproject.toml`（dev group+pytest ini）、`uv.lock`、`tests/*`、`README.md`、`feature_list.json`（feat-007 completed）、`progress.md`
+- 已知风险或未解决问题：integration 用例依赖本机服务与 config.ini 凭据，他机需先按 README 起服务；无鉴权/多用户隔离
+- 下一步最佳动作：提交 feat-007 变更。此后 feature_list 无未完成项——可扩展项包括：前端页面（Vue/React）、Redis 会话缓存接线、更多学科语料入库、检索 re-rank、接口鉴权/限流

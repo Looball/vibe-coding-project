@@ -51,10 +51,10 @@
     {
       "id": "feat-007",
       "name": "Verification & Docs",
-      "description": "pytest 覆盖 client/chunker/接口；补齐 README 与运行说明，保证从 init.sh 可干净重启",
+      "description": "pytest 覆盖 chunker/greeting/config/schemas(离线)与 API(integration)；README；确认 ./init.sh 干净重启",
       "dependencies": ["feat-006"],
-      "status": "not-started",
-      "evidence": ""
+      "status": "completed",
+      "evidence": "pytest 默认 21 passed(3 integration deselected)，-m integration 3 passed；./init.sh 全绿(compileall/import/pytest/config/服务探测)；README 就绪"
     }
   ]
 }
