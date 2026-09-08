@@ -1,23 +1,28 @@
 # VibeQA · 黑马程序员智能问答系统
 
-基于 **RAG（Retrieval-Augmented Generation）** 的 IT 学习智能问答后端：文档语料 → Parent-Child 分块 → 向量化 → Milvus 检索 → 大模型生成。
+基于 **RAG（Retrieval-Augmented Generation）** 的 IT 学习智能问答系统（后端 API + 原生前端）：文档语料 → Parent-Child 分块 → 混合检索 → 大模型生成。
 
-- **LLM / 嵌入**：SiliconFlow（OpenAI 兼容在线）：LLM `deepseek-ai/DeepSeek-V4-Flash`；嵌入 `BAAI/bge-m3`（dense 1024 维），与 Milvus 服务端 **BM25(jieba) sparse** 组成混合检索
-- **向量库**：Milvus（`VibeQA/RAGQA`，dense IVF_FLAT/COSINE + sparse SPARSE_INVERTED_INDEX/BM25）
-- **业务库**：MySQL（会话与消息持久化）、Redis（预留缓存/限流）
-- **框架**：FastAPI + SQLAlchemy + uv 管理
+- **LLM**：SiliconFlow（OpenAI 兼容在线）`deepseek-ai/DeepSeek-V4-Flash`
+- **嵌入（dense）**：SiliconFlow 在线 `BAAI/bge-m3`（1024 维）
+- **检索（sparse）**：Milvus 服务端 **BM25（jieba 分词）**，与 dense 组成**混合检索 + RRF 融合**
+- **向量库**：Milvus（`VibeQA/RAGQA`：dense IVF_FLAT/COSINE + sparse SPARSE_INVERTED_INDEX/BM25）
+- **业务库**：MySQL（会话/消息/文档/学科持久化）、Redis（预留缓存/限流）
+- **框架**：FastAPI + SQLAlchemy + uv 管理；模型接口统一走 OpenAI 兼容 SDK
+
+> 提示：嵌入/LLM 经 SiliconFlow 在线调用（`.env` 配置 base_url 与 key）；sparse 词法路依赖 Milvus 服务端 BM25 FUNCTION（需支持 jieba analyzer 的版本）。
 
 ## 目录结构
 
 ```
 app/
 ├── api/               # 路由：chat(即时+SSE)、conversations、meta(subjects/health)
-├── clients/           # DashScope client（LLM 对话/流式 + 嵌入）
-├── core/config.py     # 解析 config.ini → Settings
-├── db/                # MySQL / Redis / Milvus client
+├── clients/           # 模型 client（DashScopeClient：LLM 对话/流式 + 嵌入，指向 .env 指定服务商）
+├── core/config.py     # 解析 config.ini → Settings；.env 可覆盖 base_url/LLM/嵌入模型
+├── db/                # MySQL / Redis / Milvus client（Milvus 为 hybrid schema）
 ├── models/            # SQLAlchemy ORM 表模型
-├── rag/               # document_loader / chunker / retriever / greeting
+├── rag/               # document_loader / chunker / retriever / greeting / query_rewrite / pipeline
 ├── services/          # qa(问答编排) / ingestion(语料入库)
+frontend/              # 原生 SPA（首页/会话/学科选择，前后端分离）
 tests/                 # 单元 + integration(pytest)
 documents/data/        # PRD、技术设计、config.ini、ai_data 语料(不入库)
 ```
@@ -33,9 +38,15 @@ documents/data/        # PRD、技术设计、config.ini、ai_data 语料(不入
 
 ```bash
 uv sync                                   # 安装依赖（含 dev）
-cp .env.example .env                      # 填入真实 DASHSCOPE_API_KEY
-# 数据库/向量库/模型等非敏感配置改 documents/data/config.ini
-# 或用环境变量 EDURAG_CONFIG 指定其它 ini 路径
+cp .env.example .env                      # 填入服务商 key（当前为 SiliconFlow）
+
+# 数据库/向量库/检索参数等非敏感配置：documents/data/config.ini
+# 服务商与模型（可选覆盖，放 .env）：
+#   DASHSCOPE_API_KEY   服务商 API key（必填）
+#   DASHSCOPE_BASE_URL  如 https://api.siliconflow.cn/v1
+#   LLM_MODEL           如 deepseek-ai/DeepSeek-V4-Flash
+#   EMBEDDING_MODEL     如 BAAI/bge-m3
+# 其它 ini 路径：环境变量 EDURAG_CONFIG
 ```
 
 ### 3. 建表 + 语料入库（可选，已将 ai_data 入库）
@@ -75,7 +86,16 @@ VIBEQA_SERVE_FRONTEND=1 uv run uvicorn main:app --port 8000
 | GET | `/api/v1/subjects` | 学科列表（ai/java/test/ops/bigdata…） |
 | GET | `/api/v1/health` | 健康检查（mysql/redis/milvus 探活） |
 
-RAG 链路内部：问候语识别（命中则直接回复）→ query 嵌入 → Milvus 检索 → 子块按 `parent_chunk_id` 去重聚合取 Top `candidate_m` 父块 → 拼上下文 Prompt → LLM 生成。
+RAG 核心流程（`app/rag/pipeline.py` 编排）：
+问候语识别（命中直接回复）→（可选）**LLM Query 改写** → query 嵌入 →
+**混合检索**（dense bge-m3 + 服务端 BM25/jieba，RRF 融合）→ 子块按 `parent_chunk_id`
+去重、取最高分聚合重排取 Top `candidate_m` 父块 → 拼上下文 Prompt → LLM 生成（即时/SSE）。
+
+命令行演示完整流程：
+
+```bash
+uv run python -m app.rag.pipeline "什么是大语言模型" --subject ai     # 关闭改写加 --no-rewrite
+```
 
 ## 测试与验证
 
