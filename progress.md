@@ -7,7 +7,7 @@
 - 仓库根目录：`/Users/bing/Desktop/Github/vibe-coding`
 - 标准启动路径：`./init.sh`（uv sync → 语法/导入/配置自检）；运行时依赖 docker 服务：MySQL:3306、Redis:6379、Milvus:19530（拉起见 `CLAUDE.md`）
 - 标准验证路径：`./init.sh` + 功能烟测 `uv run python ...`（详见 `CLAUDE.md` Verification Commands）
-- 当前最高优先级未完成功能：`feat-006` REST API & Conversation（见 `feature_list.json`）
+- 当前最高优先级未完成功能：`feat-007` Verification & Docs（见 `feature_list.json`）
 - 当前 blocker：无硬阻塞。注意——在线嵌入/LLM 按量计费；宿主 `python3`(3.14) ≠ 项目 `.venv`(3.12)，命令统一 `uv run python`
 
 ## 会话记录
@@ -79,3 +79,18 @@
 - 更新过的文件或工件：`app/rag/{retriever,greeting}.py`、`app/services/qa.py`、`feature_list.json`（feat-005 completed）、`progress.md`
 - 已知风险或未解决问题：无硬阻塞。RAG 依赖在线嵌入+LLM 计费；流式已在脚本退出时有 httpcore 异步清理噪音（不影响）
 - 下一步最佳动作：提交 feat-005 变更；随后开工 `feat-006` REST API 与会话（`/chat` 即时 + SSE `/chat/stream`、会话增删查、学科列表、健康检查，Redis 会话 + MySQL 持久化）
+
+### Session 005
+
+- 日期：2026-09-08
+- 本轮目标：feat-005 收尾提交 + feat-006 REST API 与会话管理
+- 已完成：
+  - 提交 feat-005（`a5aa7b5`）
+  - `app/api/`：schemas(pydantic) + `chat.py`(`/chat` 即时、`/chat/stream` SSE via sse-starlette) + `conversations.py`(创建/列表/历史分页/发消息持久化/清除) + `meta.py`(`/subjects`、`/health` 三服务探活)；`api/__init__.py` 聚合，`create_app` 挂 `/api/v1`（移除旧内联 health）
+  - 会话用 MySQL 持久化（conversations/messages），历史按时间倒序+limit/offset 滚动
+- 运行过的验证：TestClient 全绿——health 三服务 up、subjects=5、会话 CRUD(201/204)、消息持久化 2 条且倒序、SSE `sources→message→done`、真实 RAG `/chat` 返回 3 sources(score≈0.78)并带答案；空 query=422
+- 已记录证据：上述 TestClient 输出
+- 提交记录：`a5aa7b5` feat: feat-005 检索编排与 RAG 问答（feat-006 代码尚未提交）
+- 更新过的文件或工件：`app/api/{__init__,schemas,chat,conversations,meta}.py`、`app/__init__.py`、`feature_list.json`（feat-006 completed）、`progress.md`
+- 已知风险或未解决问题：SSE 事件名约定 `sources/message/done`，前端需按此消费；会话无鉴权/多用户隔离（单机单用户，后续可加）
+- 下一步最佳动作：提交 feat-006 变更；随后开工 `feat-007` Verification & Docs——补 pytest（client/chunker/接口），写 README 与运行说明，确认 `./init.sh` 干净重启

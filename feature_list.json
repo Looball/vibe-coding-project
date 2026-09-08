@@ -43,10 +43,10 @@
     {
       "id": "feat-006",
       "name": "REST API & Conversation",
-      "description": "FastAPI 路由：/chat(即时+SSE 流式)、会话创建/历史/清除、学科列表、健康检查；Redis 会话与 MySQL 持久化",
+      "description": "FastAPI 路由：/chat(即时+SSE 流式)、会话创建/列表/历史/清除、发送消息持久化、学科列表、健康检查",
       "dependencies": ["feat-005"],
-      "status": "not-started",
-      "evidence": ""
+      "status": "completed",
+      "evidence": "TestClient：health 三服务 up、subjects=5、会话 CRUD(201/204)、消息持久化(2条,倒序)、SSE sources/message/done、RAG 问答带3 sources(score 0.78+)"
     },
     {
       "id": "feat-007",
