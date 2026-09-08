@@ -35,10 +35,10 @@
     {
       "id": "feat-005",
       "name": "Retrieval & RAG Answering",
-      "description": "检索编排：query 向量化→Milvus 检索→按 parent_chunk 聚合重排(candidate_m)→LLM 流式生成；含问候语识别与学科过滤",
+      "description": "检索编排：query 向量化→Milvus 检索→按 parent_chunk 去重聚合(candidate_m)→LLM 生成；含问候语识别与学科过滤",
       "dependencies": ["feat-004"],
-      "status": "not-started",
-      "evidence": ""
+      "status": "completed",
+      "evidence": "answer_sync/answer_stream 通过；问候语识别命中；「什么是大语言模型」命中 3 父块(score 0.76+)，LLM 结构化回答并引用资料编号"
     },
     {
       "id": "feat-006",

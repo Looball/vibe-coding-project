@@ -7,7 +7,7 @@
 - 仓库根目录：`/Users/bing/Desktop/Github/vibe-coding`
 - 标准启动路径：`./init.sh`（uv sync → 语法/导入/配置自检）；运行时依赖 docker 服务：MySQL:3306、Redis:6379、Milvus:19530（拉起见 `CLAUDE.md`）
 - 标准验证路径：`./init.sh` + 功能烟测 `uv run python ...`（详见 `CLAUDE.md` Verification Commands）
-- 当前最高优先级未完成功能：`feat-005` Retrieval & RAG Answering（见 `feature_list.json`）
+- 当前最高优先级未完成功能：`feat-006` REST API & Conversation（见 `feature_list.json`）
 - 当前 blocker：无硬阻塞。注意——在线嵌入/LLM 按量计费；宿主 `python3`(3.14) ≠ 项目 `.venv`(3.12)，命令统一 `uv run python`
 
 ## 会话记录
@@ -59,3 +59,23 @@
   - Milvus `get_collection_stats` 未 flush 时为 0，核对行数需先 `client.flush`
   - 重跑入库需 `--reset` 防重复向量；在线嵌入/LLM 按量计费
 - 下一步最佳动作：开工 `feat-005` 检索编排与 RAG 问答——Milvus `search()` 命中按 `parent_chunk_id` 去重聚合、取 Top `candidate_m`，拼 TDD 5.2 模板 prompt → `dashscope.chat`/`achat_stream` 生成；完成后提交本会话变更并新增 Session 004 条目
+
+### Session 004
+
+- 日期：2026-09-08
+- 本轮目标：feat-005 检索编排与 RAG 问答（接 Session 003 推荐），并把 Session 003 提交记录补进日志
+- 已完成：
+  - `app/rag/retriever.py`：query 向量化 → Milvus 检索 → 按 `parent_chunk_id` 去重取最高子分 → Top `candidate_m` 父块；`format_context` 拼带出处文本
+  - `app/rag/greeting.py`：问候/致谢/道别启发式识别
+  - `app/services/qa.py`：`answer_sync()`（即时）与 `answer_stream()`（sources→token→done 事件流），学科标签系统提示 + TDD 5.2 模板；无命中时返回"暂未找到"兜底
+  - progress.md 补记 Session 003 提交 `c0a107e`
+- 运行过的验证：
+  - 问候语「你好」→ 识别为 greeting 并返回友好回复
+  - 「什么是大语言模型」(ai) → 3 父块(score≈0.76) + LLM 结构化回答且标注资料编号/页
+  - 流式「什么是Scaling Law」→ 9 chunk 全量文本完整（debug 原始流验证）
+  - `uv run python -m compileall -q app` PASS
+- 已记录证据：上述三组输出；流式 end 处 GeneratorExit 告警属脚本退出噪音（服务端长驻 loop 无影响）
+- 提交记录：`e159e96` docs: progress.md 补记 Session 003 提交记录 c0a107e（feat-005 代码变更尚未提交）
+- 更新过的文件或工件：`app/rag/{retriever,greeting}.py`、`app/services/qa.py`、`feature_list.json`（feat-005 completed）、`progress.md`
+- 已知风险或未解决问题：无硬阻塞。RAG 依赖在线嵌入+LLM 计费；流式已在脚本退出时有 httpcore 异步清理噪音（不影响）
+- 下一步最佳动作：提交 feat-005 变更；随后开工 `feat-006` REST API 与会话（`/chat` 即时 + SSE `/chat/stream`、会话增删查、学科列表、健康检查，Redis 会话 + MySQL 持久化）
