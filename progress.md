@@ -53,7 +53,7 @@
   - 入库结果：2 文档（pdf 11 页 + docx 大纲）→ 70 子块；MySQL subjects=5、documents=2（chunk_count 32+38）；Milvus row_count=70（flush 后）
 - 运行过的验证：compileall PASS；`mysql.ping()` True；`ensure_collection()` 后 has_collection True；E2E 检索「什么是大语言模型」命中 LLM 相关父块 score≈0.76
 - 已记录证据：MySQL/Milvus 行数与计数输出、检索烟测输出
-- 提交记录：无（本会话变更尚未提交）
+- 提交记录：`c0a107e` feat: feat-004 语料入库完成
 - 更新过的文件或工件：`app/rag/{chunker,document_loader}.py`、`app/services/ingestion.py`、`app/db/milvus.py`、`feature_list.json`（feat-004 completed）、`progress.md`
 - 已知风险或未解决问题：
   - Milvus `get_collection_stats` 未 flush 时为 0，核对行数需先 `client.flush`
