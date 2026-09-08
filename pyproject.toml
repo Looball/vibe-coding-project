@@ -1,0 +1,44 @@
+[project]
+name = "edu-rag-system"
+version = "0.1.0"
+description = "黑马程序员智能问答系统 - RAG + Milvus"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.29.0",
+    "pymilvus>=2.4.0",
+    "pymysql>=1.1.0",
+    "redis>=5.0.0",
+    "openai>=1.0.0",
+    "python-dotenv>=1.0.0",
+    "sqlalchemy>=2.0.0",
+    "sqlalchemy-utils>=0.41.0",
+    "python-multipart>=0.0.9",
+    "sse-starlette>=2.0.0",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    "pypdf>=6.18.0",
+    "python-docx>=1.2.0",
+    "tiktoken>=0.14.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "ruff>=0.3.0",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

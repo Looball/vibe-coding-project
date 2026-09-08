@@ -1,0 +1,60 @@
+{
+  "features": [
+    {
+      "id": "feat-001",
+      "name": "Foundation & Config Loader",
+      "description": "基于 config.ini 的类型化配置中心；敏感密钥经 .env 注入；uv + FastAPI 骨架与包结构就绪",
+      "dependencies": [],
+      "status": "completed",
+      "evidence": "uv venv(py3.12)+uv sync 成功；config 解析实测 mysql_database/VibeQA、milvus_collection/RAGQA"
+    },
+    {
+      "id": "feat-002",
+      "name": "Data Store Clients",
+      "description": "MySQL(SQLAlchemy+PyMySQL)/Redis/Milvus client，ORM 表模型，Milvus Collection(RAGQA, dim1024, IVF_FLAT) 建集",
+      "dependencies": ["feat-001"],
+      "status": "completed",
+      "evidence": "mysql.ping()=True；ensure_collection() 后 has_collection=True；表 subjects/documents/conversations/messages/knowledge_points 映射 OK"
+    },
+    {
+      "id": "feat-003",
+      "name": "DashScope Model Client",
+      "description": "阿里云 DashScope 客户端：LLM 即时/同步流/异步流 + text-embedding-v3 嵌入",
+      "dependencies": ["feat-002"],
+      "status": "completed",
+      "evidence": "模块导入与实例化 OK（model=qwen3.6-plus, embedding=text-embedding-v3）"
+    },
+    {
+      "id": "feat-004",
+      "name": "Document Corpus Ingestion",
+      "description": "把 documents/data/ai_data 语料解析(PDF/DOCX)→Parent-Child 分块(1200/300/50)→DashScope 嵌入→写入 Milvus，并同步 MySQL documents/subjects 记录",
+      "dependencies": ["feat-003"],
+      "status": "in-progress",
+      "evidence": "document_loader 完成；chunker/services/ingestion 待补；执行需 Milvus/MySQL 在线 + .env 内真实 DASHSCOPE_API_KEY"
+    },
+    {
+      "id": "feat-005",
+      "name": "Retrieval & RAG Answering",
+      "description": "检索编排：query 向量化→Milvus 检索→按 parent_chunk 聚合重排(candidate_m)→LLM 流式生成；含问候语识别与学科过滤",
+      "dependencies": ["feat-004"],
+      "status": "not-started",
+      "evidence": ""
+    },
+    {
+      "id": "feat-006",
+      "name": "REST API & Conversation",
+      "description": "FastAPI 路由：/chat(即时+SSE 流式)、会话创建/历史/清除、学科列表、健康检查；Redis 会话与 MySQL 持久化",
+      "dependencies": ["feat-005"],
+      "status": "not-started",
+      "evidence": ""
+    },
+    {
+      "id": "feat-007",
+      "name": "Verification & Docs",
+      "description": "pytest 覆盖 client/chunker/接口；补齐 README 与运行说明，保证从 init.sh 可干净重启",
+      "dependencies": ["feat-006"],
+      "status": "not-started",
+      "evidence": ""
+    }
+  ]
+}
