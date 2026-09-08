@@ -1,11 +1,14 @@
 """会话管理接口：创建/列表/历史/发送消息/清除（MySQL 持久化）。"""
 from __future__ import annotations
 
+import json
 import uuid
+from collections.abc import AsyncIterator
 from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
+from sse_starlette.sse import EventSourceResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -17,7 +20,8 @@ from app.api.schemas import (
     MessageOut,
     MessageSend,
 )
-from app.db.mysql import get_db
+from app.core.config import SUBJECT_LABELS
+from app.db.mysql import SessionLocal, get_db
 from app.models.mysql_models import Conversation, Message, MessageRole
 from app.services import qa
 
@@ -152,6 +156,70 @@ def send_message(
     return ChatResponse(
         answer=result.text, sources=sources, greeting=result.greeting
     )
+
+
+@router.post(
+    "/{cid}/messages/stream",
+    summary="流式回答并写入会话",
+    description="先持久化用户问题，再 SSE 流式输出；回答结束后连同来源写入该会话。",
+)
+async def send_message_stream(cid: str, body: MessageSend) -> EventSourceResponse:
+    """流式问答且持久化：用户消息先行落库，流式结束后写 assistant 消息。"""
+    db = SessionLocal()
+    try:
+        conv = _get_conversation(db, cid)
+        if body.subject and body.subject not in SUBJECT_LABELS:
+            raise HTTPException(
+                status_code=400, detail=f"subject '{body.subject}' 不在支持范围 {list(SUBJECT_LABELS)}"
+            )
+        db.add(
+            Message(conversation_id=cid, role=MessageRole.user, content=body.query)
+        )
+        if not conv.title:
+            conv.title = body.query[:50]
+        conv.updated_at = datetime.now()
+        db.commit()
+    finally:
+        db.close()
+
+    return EventSourceResponse(_stream_and_persist(cid, body.query, body.subject))
+
+
+async def _stream_and_persist(
+    cid: str, query: str, subject: str | None
+) -> AsyncIterator[dict]:
+    """转发 qa 流式事件；会话结束（含客户端中断）后回写 assistant 消息。"""
+    acc: list[str] = []
+    sources: list[dict] = []
+    try:
+        async for ev in qa.answer_stream(query, subject_code=subject):
+            if ev["type"] == "sources":
+                sources = ev["sources"]
+                yield {"event": "sources", "data": json.dumps(sources, ensure_ascii=False)}
+            elif ev["type"] == "token":
+                acc.append(ev["content"])
+                yield {"event": "message", "data": ev["content"]}
+            else:  # done
+                yield {"event": "done", "data": ""}
+    finally:
+        text = "".join(acc).strip()
+        if text:  # 有内容才回写（含中断后的部分回答）
+            db = SessionLocal()
+            try:
+                db.add(
+                    Message(
+                        conversation_id=cid,
+                        role=MessageRole.assistant,
+                        content=text,
+                        sources=sources,
+                    )
+                )
+                conv = db.get(Conversation, cid)
+                if conv:
+                    conv.updated_at = datetime.now()
+                db.commit()
+            finally:
+                db.close()
 
 
 @router.delete("/{cid}", status_code=status.HTTP_204_NO_CONTENT)

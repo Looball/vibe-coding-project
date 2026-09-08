@@ -214,8 +214,15 @@ async function askPersist(q) {
   await loadConversations(); // 刷新标题与消息数
 }
 
-/* 流式回答：走 /chat/stream(SSE)，本演示不写会话历史 */
+/* 流式回答：走会话流式接口(SSE)，user 先行入库、完成后 assistant 一并写入历史 */
 async function streamAsk(q) {
+  if (!state.convId) {
+    const created = await api("/api/v1/conversations", {
+      method: "POST",
+      body: JSON.stringify({ title: q.slice(0, 50) }),
+    });
+    state.convId = created.id;
+  }
   addMsg("user", q);
   const row = el("div", "msg assistant");
   const bubble = el("div", "bubble");
@@ -235,11 +242,14 @@ async function streamAsk(q) {
     messagesBox.scrollTop = messagesBox.scrollHeight;
   };
 
-  const resp = await fetch(API_ORIGIN + "/api/v1/chat/stream", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ query: q, subject: state.subject }),
-  });
+  const resp = await fetch(
+    API_ORIGIN + "/api/v1/conversations/" + state.convId + "/messages/stream",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query: q, subject: state.subject }),
+    }
+  );
   if (!resp.ok || !resp.body) throw new Error("流式请求失败 " + resp.status);
 
   const reader = resp.body.getReader();
@@ -303,6 +313,7 @@ async function streamAsk(q) {
     cursor.remove();
     text.textContent = "(空回复)";
   }
+  try { await loadConversations(); } catch { /* 忽略刷新失败 */ }
 }
 
 /* ---------------- 状态与启动 ---------------- */
@@ -335,7 +346,7 @@ function bind() {
     r.onchange = () => {
       state.mode = r.value;
       tip.textContent =
-        r.value === "stream" ? "流式回答实时逐字输出（当前演示不写入会话历史）" : "";
+        r.value === "stream" ? "流式回答逐字输出，结束后自动写入会话历史" : "";
     };
   });
 }
