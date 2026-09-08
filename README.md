@@ -1,4 +1,4 @@
-# VibeQA · 黑马程序员智能问答系统
+# VibeQA · 智能问答系统
 
 基于 **RAG（Retrieval-Augmented Generation）** 的 IT 学习智能问答系统（后端 API + 原生前端）：文档语料 → Parent-Child 分块 → 混合检索 → 大模型生成。
 

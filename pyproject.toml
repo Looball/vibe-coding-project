@@ -1,7 +1,7 @@
 [project]
 name = "edu-rag-system"
 version = "0.1.0"
-description = "黑马程序员智能问答系统 - RAG + Milvus"
+description = "智能问答系统 - RAG + Milvus"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.110.0",

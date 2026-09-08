@@ -17,7 +17,7 @@ SERVE_FRONTEND = os.environ.get("VIBEQA_SERVE_FRONTEND", "").lower() in ("1", "t
 def create_app() -> FastAPI:
     app = FastAPI(
         title=settings.app_name,
-        description="黑马程序员智能问答系统",
+        description="智能问答系统",
         version="0.1.0",
         docs_url="/docs",
         redoc_url="/redoc",
