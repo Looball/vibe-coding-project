@@ -124,6 +124,16 @@ def load_settings(path: str | Path | None = None) -> Settings:
 
 settings = load_settings()
 
+# .env 覆盖（便于切换服务商/模型）：base_url 与模型名可在 .env 里覆盖 config.ini
+for attr, env_key in (
+    ("dashscope_base_url", "DASHSCOPE_BASE_URL"),
+    ("llm_model", "LLM_MODEL"),
+    ("embedding_model", "EMBEDDING_MODEL"),
+):
+    value = os.environ.get(env_key, "").strip()
+    if value:
+        setattr(settings, attr, value)
+
 
 SUBJECT_LABELS = {
     "ai": "人工智能",

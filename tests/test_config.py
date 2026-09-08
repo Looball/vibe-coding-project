@@ -32,7 +32,7 @@ def test_valid_sources_contains_ai():
 def test_llm_config():
     assert settings.dashscope_base_url.startswith("https://")
     assert settings.llm_model
-    assert settings.embedding_model.startswith("text-embedding")
+    assert settings.embedding_model
 
 
 def test_connection_urls_built():

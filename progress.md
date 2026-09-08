@@ -135,3 +135,24 @@
 - 更新过的文件或工件：`app/core/config.py`、`app/rag/{query_rewrite,pipeline,retriever}.py`、`app/db/milvus.py`、`app/services/{qa,ingestion}.py`、`tests/test_pipeline_offline.py`、`feature_list.json`（feat-008 completed）、`progress.md`
 - 已知风险或未解决问题：Milvus BM25 analyzer 需服务端支持 jieba（本机 v3.0.0 可用；他机需确认版本）；混合检索依赖 RAGQA 为重建后 schema，旧数据需 `--reset` 重入库；改写为在线 LLM 调用、增加一次延迟（可用环境变量关闭）
 - 下一步最佳动作：提交 feat-008 变更；随后可提交前先 `git status` 复核。后续扩展见 Session 006 列表
+
+### Session 008
+
+- 日期：2026-09-08
+- 本轮目标：嵌入方案定稿为「在线 BGE-M3(dense) + 本地 Milvus BM25/jieba(sparse)」混合检索；修复真机 SSE 暴露的 bug
+- 已完成：
+  - 服务商切到 SiliconFlow（OpenAI 兼容）：config 支持 .env 覆盖 `DASHSCOPE_BASE_URL`/`LLM_MODEL`/`EMBEDDING_MODEL`；当前 LLM=`deepseek-ai/DeepSeek-V4-Flash`、嵌入=`BAAI/bge-m3`
+  - `app/db/milvus.py` 保持混合 schema：`chunk_text` analyzer(jieba)+BM25 FUNCTION→sparse，dense 向量由在线 bge-m3 产出(1024)；`hybrid_search`(RRF)
+  - `RAGQA` 重建并重入库 70 子块（bge-m3 在线嵌入，实测 dim=1024）
+  - 修复 `app/api/chat.py` SSE：qa 重构后 sources 为 dict，旧代码用 `s.__dict__` 致带来源流式 500 → 改 `json.dumps(ev["sources"])`
+  - 真机 uvicorn 验证接口 9 条注册；health/subjects/chat(问候+RAG)/会话 CRUD 均通
+- 运行过的验证：
+  - SiliconFlow bge-m3 embed dim=1024、DeepSeek chat OK
+  - `RAGQA` fields 含 sparse、row_count 70；hybrid 检索命中（含词法路命中含关键词文档）
+  - E2E「大语言模型经历了哪些发展阶段」→ DeepSeek 改写→hybrid Top3→LLM 三阶段结构化作答
+  - `uv run python -m pytest` → 27 passed / 3 deselected；`-m integration` → 3 passed
+- 已记录证据：上述 hybrid 命中列表、CLI 输出、pytest 输出
+- 提交记录：无（本轮变更尚未提交）
+- 更新过的文件或工件：`app/core/config.py`（env 覆盖）、`app/db/milvus.py`、`app/rag/retriever.py`、`app/api/chat.py`（SSE 修复）、`tests/test_config.py`、`README.md`、`progress.md`
+- 已知风险或未解决问题：bge-m3 在线 API 仅返回 dense，sparse 词法路依赖服务端 BM25/jieba（Milvus 需支持 analyzer）；key/模型名在 .env，勿提交；Embedding 相关属性名仍叫 `dashscope_*`（实际指向 SiliconFlow），如需可后续重命名
+- 下一步最佳动作：提交本轮变更（SSE 修复 + BGE-M3 切换）；如需真机 SSE 复验，确认 .env key 有效后启动 uvicorn 再 curl

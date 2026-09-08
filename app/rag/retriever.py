@@ -40,7 +40,7 @@ def retrieve(
     m = candidate_m or settings.candidate_m
 
     query_vec = get_llm_client().embed_text(query)
-    # 混合检索：稠密(语义) + 稀疏(BM25/jieba 词法) 双路召回后 RRF 融合
+    # 混合检索：稠密(bge-m3 语义) + 稀疏(服务端 BM25/jieba 词法) 双路召回后 RRF 融合
     hits = get_store().hybrid_search(
         query_text=query, query_vector=query_vec, subject_code=subject_code, limit=k
     )

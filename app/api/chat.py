@@ -29,7 +29,7 @@ async def _sse_events(query: str, subject: str | None) -> AsyncIterator[dict]:
         if ev["type"] == "sources":
             yield {
                 "event": "sources",
-                "data": json.dumps([s.__dict__ for s in ev["sources"]], ensure_ascii=False),
+                "data": json.dumps(ev["sources"], ensure_ascii=False),
             }
         elif ev["type"] == "token":
             yield {"event": "message", "data": ev["content"]}

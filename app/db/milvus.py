@@ -1,14 +1,16 @@
 """Milvus 向量数据库客户端：配置来自 config.ini 的 [milvus] 节。
 
-collection（默认 RAGQA）为混合检索（Hybrid Search）schema：
+collection（默认 RAGQA）为混合检索（Hybrid）schema：
     稠密路 embedding(FLOAT_VECTOR, dim=1024, IVF_FLAT/COSINE)
-    稀疏路 chunk_text 经 BM25(jieba 分词) FUNCTION 生成 sparse(SPARSE_FLOAT_VECTOR)
-两路召回后用 RRF 融合。
+        向量来自 .env 指定模型（BAAI/bge-m3，SiliconFlow 在线嵌入）
+    稀疏路 chunk_text 经服务端 BM25 FUNCTION（analyzer=jieba 分词）产出
+        sparse(SPARSE_FLOAT_VECTOR / SPARSE_INVERTED_INDEX / BM25)
+    两路召回后用 RRF 融合（hybrid_search）。
 
 业务字段：chunk_id / parent_chunk_id / document_id / doc_title /
 subject_code / chunk_text / parent_text / page
 
-Parent-Child 检索：子块入库（chunk_text+embedding），命中后回取
+Parent-Child 检索：子块入库（chunk_text + embedding），命中后回取
 父块（parent_text）作 LLM 上下文。
 """
 from __future__ import annotations
@@ -27,7 +29,7 @@ from pymilvus import (
 
 from app.core.config import settings
 
-EMBEDDING_DIM = 1024  # 阿里云 text-embedding-v3 默认维度
+EMBEDDING_DIM = 1024  # BAAI/bge-m3 dense 输出维度
 
 _store: "MilvusStore | None" = None
 
@@ -47,6 +49,17 @@ class SearchHit:
 
 class MilvusStore:
     """Milvus 客户端封装：连接管理、建集、写入、检索、删除。"""
+
+    _OUTPUT_FIELDS = [
+        "chunk_id",
+        "parent_chunk_id",
+        "document_id",
+        "doc_title",
+        "subject_code",
+        "chunk_text",
+        "parent_text",
+        "page",
+    ]
 
     def __init__(self, host: str, port: int, database: str, collection: str) -> None:
         self._uri = f"http://{host}:{port}"
@@ -79,7 +92,7 @@ class MilvusStore:
         self.client.drop_collection(self._collection)
 
     def ensure_collection(self) -> None:
-        """若 collection 不存在则按设计文档 Schema 创建。"""
+        """若 collection 不存在则创建混合检索 Schema（BM25/jieba sparse + dense）。"""
         if self.has_collection():
             return
 
@@ -100,7 +113,7 @@ class MilvusStore:
         schema.add_field("parent_text", DataType.VARCHAR, max_length=20000)
         schema.add_field("page", DataType.INT64)
         schema.add_field("embedding", DataType.FLOAT_VECTOR, dim=EMBEDDING_DIM)
-        # 稀疏路：BM25 FUNCTION 依据 chunk_text(分词) 产出 sparse 向量
+        # 稀疏路：BM25 FUNCTION 依据 chunk_text(服务端 jieba 分词) 产出 sparse
         schema.add_field("sparse", DataType.SPARSE_FLOAT_VECTOR)
         schema.add_function(
             Function(
@@ -132,40 +145,16 @@ class MilvusStore:
 
     # ---------- 写入 ----------
 
-    def insert(
-        self,
-        rows: list[dict[str, Any]],
-    ) -> list[int]:
-        """写入向量数据。
-
-        Args:
-            rows: 每项形如 {chunk_id, parent_chunk_id, document_id, doc_title,
-                           subject_code, chunk_text, parent_text, page,
-                           embedding}
-                  其中 id 由 auto_id 自动生成。
-
-        Returns:
-            自动生成的主键 id 列表。
-        """
+    def insert(self, rows: list[dict[str, Any]]) -> list[int]:
+        """写入向量数据（sparse 由服务端 BM25 FUNCTION 依据 chunk_text 自动产出）。"""
         result = self.client.insert(collection_name=self._collection, data=rows)
         return result.get("ids", [])
-
-    # ---------- 检索 ----------
-
-    _OUTPUT_FIELDS = [
-        "chunk_id",
-        "parent_chunk_id",
-        "document_id",
-        "doc_title",
-        "subject_code",
-        "chunk_text",
-        "parent_text",
-        "page",
-    ]
 
     def flush(self) -> None:
         """强制落盘，使计数/检索立即可见。"""
         self.client.flush(self._collection)
+
+    # ---------- 检索 ----------
 
     def search(
         self,
@@ -174,7 +163,7 @@ class MilvusStore:
         limit: int | None = None,
         nprobe: int = 16,
     ) -> list[SearchHit]:
-        """纯稠密向量检索（无 BM25 函数时可作回退）。"""
+        """纯稠密向量检索（回退路径）。"""
         expr = f'subject_code == "{subject_code}"' if subject_code else None
         result = self.client.search(
             collection_name=self._collection,
@@ -194,11 +183,11 @@ class MilvusStore:
         limit: int | None = None,
         nprobe: int = 16,
     ) -> list[SearchHit]:
-        """混合检索：稠密(embedding/COSINE) + 稀疏(BM25/jieba) 双路召回，RRF 融合。
+        """混合检索：稠密(bge-m3/COSINE) + 稀疏(服务端 BM25+jieba) 双路召回后 RRF 融合。
 
         Args:
-            query_text: 原文/改写后查询，用于 BM25 稀疏检索。
-            query_vector: 查询嵌入向量，用于稠密检索。
+            query_text: 原文/改写后查询，服务端 BM25 据此分词检索 sparse。
+            query_vector: 查询的 bge-m3 稠密向量。
             subject_code: 学科过滤，None 表示全学科。
             limit: 融合后返回条数，默认 retrieval_k。
         """
@@ -212,7 +201,7 @@ class MilvusStore:
             expr=expr,
         )
         sparse_req = AnnSearchRequest(
-            data=[query_text],  # BM25 FUNCTION：传文本即可在服务端分词
+            data=[query_text],  # BM25 FUNCTION：传文本由服务端分词
             anns_field="sparse",
             param={},
             limit=k,

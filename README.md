@@ -2,8 +2,8 @@
 
 基于 **RAG（Retrieval-Augmented Generation）** 的 IT 学习智能问答后端：文档语料 → Parent-Child 分块 → 向量化 → Milvus 检索 → 大模型生成。
 
-- **LLM / 嵌入**：阿里云 DashScope（`qwen3.6-plus` + `text-embedding-v3`，在线调用）
-- **向量库**：Milvus（`VibeQA/RAGQA`，1024 维 IVF_FLAT/COSINE）
+- **LLM / 嵌入**：SiliconFlow（OpenAI 兼容在线）：LLM `deepseek-ai/DeepSeek-V4-Flash`；嵌入 `BAAI/bge-m3`（dense 1024 维），与 Milvus 服务端 **BM25(jieba) sparse** 组成混合检索
+- **向量库**：Milvus（`VibeQA/RAGQA`，dense IVF_FLAT/COSINE + sparse SPARSE_INVERTED_INDEX/BM25）
 - **业务库**：MySQL（会话与消息持久化）、Redis（预留缓存/限流）
 - **框架**：FastAPI + SQLAlchemy + uv 管理
 
