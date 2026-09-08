@@ -123,3 +123,18 @@ def load_settings(path: str | Path | None = None) -> Settings:
 
 
 settings = load_settings()
+
+
+SUBJECT_LABELS = {
+    "ai": "人工智能",
+    "java": "Java",
+    "test": "软件测试",
+    "ops": "运维",
+    "bigdata": "大数据",
+}
+
+
+def subject_label(subject_code: str | None) -> str:
+    if not subject_code:
+        return "通用"
+    return SUBJECT_LABELS.get(subject_code, subject_code)

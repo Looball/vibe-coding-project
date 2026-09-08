@@ -7,7 +7,7 @@
 - 仓库根目录：`/Users/bing/Desktop/Github/vibe-coding`
 - 标准启动路径：`./init.sh`（uv sync → 语法/导入/配置自检）；运行时依赖 docker 服务：MySQL:3306、Redis:6379、Milvus:19530（拉起见 `CLAUDE.md`）
 - 标准验证路径：`./init.sh` + 功能烟测 `uv run python ...`（详见 `CLAUDE.md` Verification Commands）
-- 当前最高优先级未完成功能：无（feat-001~007 已全部完成；后续为新增需求/前端等扩展）
+- 当前最高优先级未完成功能：无（feat-001~008 已全部完成；后续为新增需求/前端等扩展）
 - 当前 blocker：无硬阻塞。注意——在线嵌入/LLM 按量计费；宿主 `python3`(3.14) ≠ 项目 `.venv`(3.12)，命令统一 `uv run python`
 
 ## 会话记录
@@ -112,3 +112,26 @@
 - 更新过的文件或工件：`pyproject.toml`（dev group+pytest ini）、`uv.lock`、`tests/*`、`README.md`、`feature_list.json`（feat-007 completed）、`progress.md`
 - 已知风险或未解决问题：integration 用例依赖本机服务与 config.ini 凭据，他机需先按 README 起服务；无鉴权/多用户隔离
 - 下一步最佳动作：提交 feat-007 变更。此后 feature_list 无未完成项——可扩展项包括：前端页面（Vue/React）、Redis 会话缓存接线、更多学科语料入库、检索 re-rank、接口鉴权/限流
+
+### Session 007
+
+- 日期：2026-09-08
+- 本轮目标：实现完整 RAG 核心业务流程——Query 改写 + 混合检索(sparse+dense)（feat-008）
+- 已完成：
+  - `app/core/config.py` 并入 `SUBJECT_LABELS`/`subject_label()`（去重 ingestion/qa 复制）
+  - `app/rag/query_rewrite.py`：LLM 改写（`EDURAG_DISABLE_REWRITE=1` 可关，失败回退原文）
+  - `app/db/milvus.py`：RAGQA schema 重建为**混合检索**——`chunk_text` 开 analyzer(jieba)、BM25 FUNCTION→`sparse`(SPARSE_FLOAT_VECTOR/SPARSE_INVERTED_INDEX)、保留 dense(IVF_FLAT/COSINE)；新增 `hybrid_search`(dense+BM25→RRF 融合)、`flush`
+  - `app/rag/retriever.py` 改走 `hybrid_search`
+  - `app/rag/pipeline.py`：RAG 流程编排（问候→改写→混合召回→父块去重重排→上下文）+ CLI 演示；`app/services/qa.py` 重写为 pipeline 薄层
+  - ingestion 落库后 `flush()`（sparse 索引即时可用）；`--reset` 重建并重入库 70 子块
+- 运行过的验证：
+  - BM25+jieba 在服务端端到端验证（临时集 + RAGQA 实测，sparse 传文本检索正确）
+  - `RAGQA` 重建后 fields 含 sparse，row_count 70
+  - hybrid 真实命中：「就业课程大纲」词法路把课程大纲文档顶到第一（纯 dense 时被压后）
+  - CLI 全流程演示：改写「就业课程包含哪些人工智能模块?」→ Top3 父块→LLM 引用作答
+  - `uv run python -m pytest` → 27 passed / 3 deselected；`-m integration` → 3 passed
+- 已记录证据：以上 hybrid 命中列表与 CLI 输出
+- 提交记录：无（feat-008 变更尚未提交）
+- 更新过的文件或工件：`app/core/config.py`、`app/rag/{query_rewrite,pipeline,retriever}.py`、`app/db/milvus.py`、`app/services/{qa,ingestion}.py`、`tests/test_pipeline_offline.py`、`feature_list.json`（feat-008 completed）、`progress.md`
+- 已知风险或未解决问题：Milvus BM25 analyzer 需服务端支持 jieba（本机 v3.0.0 可用；他机需确认版本）；混合检索依赖 RAGQA 为重建后 schema，旧数据需 `--reset` 重入库；改写为在线 LLM 调用、增加一次延迟（可用环境变量关闭）
+- 下一步最佳动作：提交 feat-008 变更；随后可提交前先 `git status` 复核。后续扩展见 Session 006 列表

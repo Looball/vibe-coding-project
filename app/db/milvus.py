@@ -1,11 +1,14 @@
 """Milvus 向量数据库客户端：配置来自 config.ini 的 [milvus] 节。
 
-collection（默认 RAGQA）字段设计：
-    id / chunk_id / parent_chunk_id / document_id / doc_title /
-    subject_code / chunk_text / parent_text / page /
-    embedding(FLOAT_VECTOR, dim=1024)
+collection（默认 RAGQA）为混合检索（Hybrid Search）schema：
+    稠密路 embedding(FLOAT_VECTOR, dim=1024, IVF_FLAT/COSINE)
+    稀疏路 chunk_text 经 BM25(jieba 分词) FUNCTION 生成 sparse(SPARSE_FLOAT_VECTOR)
+两路召回后用 RRF 融合。
 
-使用 Parent-Child 检索：子块向量入库（chunk_text），命中后回取
+业务字段：chunk_id / parent_chunk_id / document_id / doc_title /
+subject_code / chunk_text / parent_text / page
+
+Parent-Child 检索：子块入库（chunk_text+embedding），命中后回取
 父块（parent_text）作 LLM 上下文。
 """
 from __future__ import annotations
@@ -13,7 +16,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from pymilvus import DataType, MilvusClient
+from pymilvus import (
+    AnnSearchRequest,
+    DataType,
+    Function,
+    FunctionType,
+    MilvusClient,
+    RRFRanker,
+)
 
 from app.core.config import settings
 
@@ -80,10 +90,26 @@ class MilvusStore:
         schema.add_field("document_id", DataType.INT64)
         schema.add_field("doc_title", DataType.VARCHAR, max_length=200)
         schema.add_field("subject_code", DataType.VARCHAR, max_length=20)
-        schema.add_field("chunk_text", DataType.VARCHAR, max_length=2000)
+        schema.add_field(
+            "chunk_text",
+            DataType.VARCHAR,
+            max_length=2000,
+            enable_analyzer=True,
+            analyzer_params={"tokenizer": "jieba"},
+        )
         schema.add_field("parent_text", DataType.VARCHAR, max_length=20000)
         schema.add_field("page", DataType.INT64)
         schema.add_field("embedding", DataType.FLOAT_VECTOR, dim=EMBEDDING_DIM)
+        # 稀疏路：BM25 FUNCTION 依据 chunk_text(分词) 产出 sparse 向量
+        schema.add_field("sparse", DataType.SPARSE_FLOAT_VECTOR)
+        schema.add_function(
+            Function(
+                name="bm25",
+                function_type=FunctionType.BM25,
+                input_field_names=["chunk_text"],
+                output_field_names="sparse",
+            )
+        )
 
         index_params = MilvusClient.prepare_index_params()
         index_params.add_index(
@@ -91,6 +117,11 @@ class MilvusStore:
             index_type="IVF_FLAT",
             metric_type="COSINE",
             params={"nlist": 1024},
+        )
+        index_params.add_index(
+            field_name="sparse",
+            index_type="SPARSE_INVERTED_INDEX",
+            metric_type="BM25",
         )
 
         self.client.create_collection(
@@ -121,6 +152,21 @@ class MilvusStore:
 
     # ---------- 检索 ----------
 
+    _OUTPUT_FIELDS = [
+        "chunk_id",
+        "parent_chunk_id",
+        "document_id",
+        "doc_title",
+        "subject_code",
+        "chunk_text",
+        "parent_text",
+        "page",
+    ]
+
+    def flush(self) -> None:
+        """强制落盘，使计数/检索立即可见。"""
+        self.client.flush(self._collection)
+
     def search(
         self,
         query_vector: list[float],
@@ -128,33 +174,60 @@ class MilvusStore:
         limit: int | None = None,
         nprobe: int = 16,
     ) -> list[SearchHit]:
-        """向量检索。
-
-        Args:
-            query_vector: 问题/子块的嵌入向量(长度 EMBEDDING_DIM)。
-            subject_code: 学科过滤，None 表示全学科。
-            limit: 返回条数，默认取 config.ini 的 retrieval_k。
-            nprobe: IVF_FLAT 探测分区数。
-        """
+        """纯稠密向量检索（无 BM25 函数时可作回退）。"""
         expr = f'subject_code == "{subject_code}"' if subject_code else None
         result = self.client.search(
             collection_name=self._collection,
             data=[query_vector],
             filter=expr,
             limit=limit or settings.retrieval_k,
-            output_fields=[
-                "chunk_id",
-                "parent_chunk_id",
-                "document_id",
-                "doc_title",
-                "subject_code",
-                "chunk_text",
-                "parent_text",
-                "page",
-            ],
+            output_fields=self._OUTPUT_FIELDS,
             search_params={"metric_type": "COSINE", "params": {"nprobe": nprobe}},
         )
+        return self._parse_search(result)
 
+    def hybrid_search(
+        self,
+        query_text: str,
+        query_vector: list[float],
+        subject_code: str | None = None,
+        limit: int | None = None,
+        nprobe: int = 16,
+    ) -> list[SearchHit]:
+        """混合检索：稠密(embedding/COSINE) + 稀疏(BM25/jieba) 双路召回，RRF 融合。
+
+        Args:
+            query_text: 原文/改写后查询，用于 BM25 稀疏检索。
+            query_vector: 查询嵌入向量，用于稠密检索。
+            subject_code: 学科过滤，None 表示全学科。
+            limit: 融合后返回条数，默认 retrieval_k。
+        """
+        expr = f'subject_code == "{subject_code}"' if subject_code else None
+        k = settings.retrieval_k
+        dense_req = AnnSearchRequest(
+            data=[query_vector],
+            anns_field="embedding",
+            param={"metric_type": "COSINE", "params": {"nprobe": nprobe}},
+            limit=k,
+            expr=expr,
+        )
+        sparse_req = AnnSearchRequest(
+            data=[query_text],  # BM25 FUNCTION：传文本即可在服务端分词
+            anns_field="sparse",
+            param={},
+            limit=k,
+            expr=expr,
+        )
+        result = self.client.hybrid_search(
+            collection_name=self._collection,
+            reqs=[dense_req, sparse_req],
+            ranker=RRFRanker(),
+            limit=limit or k,
+            output_fields=self._OUTPUT_FIELDS,
+        )
+        return self._parse_search(result)
+
+    def _parse_search(self, result) -> list[SearchHit]:
         hits: list[SearchHit] = []
         for hit in result[0]:
             entity = hit.get("entity", {})

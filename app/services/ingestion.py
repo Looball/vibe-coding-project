@@ -167,6 +167,10 @@ def ingest_document(
     store.ensure_collection()
     for i in range(0, len(rows), 64):
         store.insert(rows[i : i + 64])
+    try:
+        store.flush()  # 让 dense/sparse(BM25) 索引立即可检索
+    except Exception:
+        pass
 
     record.chunk_count = len(rows)
     record.status = DocumentStatus.processed

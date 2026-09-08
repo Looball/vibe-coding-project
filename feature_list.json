@@ -55,6 +55,14 @@
       "dependencies": ["feat-006"],
       "status": "completed",
       "evidence": "pytest 默认 21 passed(3 integration deselected)，-m integration 3 passed；./init.sh 全绿(compileall/import/pytest/config/服务探测)；README 就绪"
+    },
+    {
+      "id": "feat-008",
+      "name": "RAG 核心流程增强：Query 改写 + 混合检索",
+      "description": "pipeline 编排(问候→LLM Query 改写→稠密+稀疏混合检索→RRF融合→父块去重重排)；Milvus RAGQA 重建为 BM25(jieba 分词)+dense schema",
+      "dependencies": ["feat-007"],
+      "status": "completed",
+      "evidence": "RAGQA 重建含 sparse/BM25 字段 row_count 70；hybrid 检索真实命中(「就业课程大纲」词法路生效)；CLI 全流程：改写+Top3 父块+LLM 引用作答；pytest 27+3 通过"
     }
   ]
 }
