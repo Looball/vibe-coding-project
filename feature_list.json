@@ -29,8 +29,8 @@
       "name": "Document Corpus Ingestion",
       "description": "把 documents/data/ai_data 语料解析(PDF/DOCX)→Parent-Child 分块(1200/300/50)→DashScope 嵌入→写入 Milvus，并同步 MySQL documents/subjects 记录",
       "dependencies": ["feat-003"],
-      "status": "in-progress",
-      "evidence": "document_loader 完成；chunker/services/ingestion 待补；执行需 Milvus/MySQL 在线 + .env 内真实 DASHSCOPE_API_KEY"
+      "status": "completed",
+      "evidence": "ai_data 2 文档=70 子块入库 VibeQA/RAGQA；MySQL documents 2 行(chunk_count 32+38)，Milvus row_count 70；检索烟测命中 LLM 相关父块(score≈0.76)"
     },
     {
       "id": "feat-005",

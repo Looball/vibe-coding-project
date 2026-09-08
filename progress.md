@@ -1,73 +1,61 @@
-# Session Progress Log
+# 进度日志
 
-## Current State
+这是一个通用的仓库内会话进度日志。claude-progress.md 只是课程沿用的历史文件名，并不要求使用 Claude Code。只要仓库里的指令明确要求，Codex 或其他 coding agent 都可以在开工时读取、交接前更新；agent 不会自动维护这个文件。
 
-**Last Updated:** 2026-09-08 20:05
-**Session ID:** vibe-coding / harness-create
-**Active Feature:** feat-004 - Document Corpus Ingestion
+## 当前已验证状态
 
-## Status
+- 仓库根目录：`/Users/bing/Desktop/Github/vibe-coding`
+- 标准启动路径：`./init.sh`（uv sync → 语法/导入/配置自检）；运行时依赖 docker 服务：MySQL:3306、Redis:6379、Milvus:19530（拉起见 `CLAUDE.md`）
+- 标准验证路径：`./init.sh` + 功能烟测 `uv run python ...`（详见 `CLAUDE.md` Verification Commands）
+- 当前最高优先级未完成功能：`feat-005` Retrieval & RAG Answering（见 `feature_list.json`）
+- 当前 blocker：无硬阻塞。注意——在线嵌入/LLM 按量计费；宿主 `python3`(3.14) ≠ 项目 `.venv`(3.12)，命令统一 `uv run python`
 
-### What's Done
+## 会话记录
 
-- [x] feat-001 基础与配置中心：`config.ini` 解析、`.env` 注入 `DASHSCOPE_API_KEY`、uv + FastAPI 骨架
-- [x] feat-002 存储 client：MySQL/Redis/Milvus + ORM 表模型 + Milvus collection `RAGQA` 建集
-- [x] feat-003 DashScope client：LLM 即时/流式 + `text-embedding-v3` 嵌入
-- [x] 环境就绪：启动 Milvus(etcd+standalone)；MySQL 建库 `VibeQA`；Python 端 `mysql.ping()` 与 `ensure_collection()` 均通过
-- [x] `app/rag/document_loader.py`：PDF(pypdf)/DOCX(python-docx) 按页抽取
-- [x] 本会话为项目创建最小 harness（CLAUDE.md/feature_list.json/progress.md/session-handoff.md/init.sh）
+### Session 001
 
-### What's In Progress
+- 日期：2026-09-08
+- 本轮目标：从 PRD 产出技术设计文档；用 uv 建 Python 项目骨架；基于 config.ini 生成配置中心与 MySQL/Milvus/Redis/模型 client
+- 已完成：
+  - `documents/data/technical_design_document.md`（RAG + Milvus + 阿里云 DashScope，Parent-Child 1200/300/50）
+  - `uv venv`(py3.12) + `pyproject.toml`/`uv.lock`；FastAPI 骨架 `app/{core,db,models,clients,rag,services}`
+  - 配置中心解析 config.ini；`.env` 仅承载 `DASHSCOPE_API_KEY`
+  - MySQL(SQLAlchemy+PyMySQL)/Redis/Milvus client 与 ORM 表模型（subjects/documents/conversations/messages/knowledge_points）
+  - DashScope client：LLM 即时/同步流/异步流 + `text-embedding-v3` 嵌入
+- 运行过的验证：`uv run python -m compileall -q app main.py` PASS；config 解析正确；导入链与 `create_app()` OK
+- 已记录证据：client 模块导入、Milvus schema 离线构建、DashScope 实例化均通过
+- 提交记录：无（变更在 Session 002 首次提交一并纳入）
+- 更新过的文件或工件：`documents/data/technical_design_document.md`、`pyproject.toml`/`uv.lock`、`app/*`、`main.py`
+- 已知风险或未解决问题：config.ini 当时未指向可用库/凭据（后续由 Session 003 环境就绪解决，配置改为 VibeQA）
+- 下一步最佳动作：推进环境就绪与语料入库
 
-- [ ] feat-004 语料入库
-  - Details: 待写 `app/rag/chunker.py`（Parent-Child 1200/300/50）与 `app/services/ingestion.py`（解析→分块→DashScope 嵌入→写 Milvus + MySQL documents/subjects）
-  - Blockers: 无硬阻塞；真实执行需 Milvus/MySQL 在线（当前在线）+ `.env` 真实 API key（已配置），会消耗少量嵌入 API 费用
+### Session 002
 
-### What's Next
+- 日期：2026-09-08
+- 本轮目标：建立项目 harness（agent 协作基线）；git 初始化并首次提交
+- 已完成：
+  - `/harness-creator` 生成 `CLAUDE.md` / `feature_list.json` / `progress.md` / `session-handoff.md` / `init.sh`（validate 100/100）
+  - `.gitignore` 排除 `.env`、`config.ini`、`documents/data/ai_data/`；`git init -b main`；首次提交
+- 运行过的验证：`node .../validate-harness.mjs` → 100/100；`./init.sh` 全流程通过（uv sync→compileall→import→config→服务探测）
+- 已记录证据：`init.sh` 输出与 `validate-harness.mjs` 报告
+- 提交记录：`8cff070` chore: 初始化 VibeQA RAG 智能问答系统项目（27 files / +3558）
+- 更新过的文件或工件：`CLAUDE.md`、`feature_list.json`、`progress.md`、`session-handoff.md`、`init.sh`、`.gitignore`
+- 已知风险或未解决问题：本目录早期非 git 仓库，无版本回退；敏感/语料文件已入忽略清单
+- 下一步最佳动作：衔接 Session 003 完成语料入库
 
-1. 写 `app/rag/chunker.py`（token 窗口 + 中文句界回退，overlap=50）
-2. 写 `app/services/ingestion.py`：种子 subjects → init_db 建表 → 逐文档分块/嵌入/批量写 Milvus，回填 documents 表
-3. 运行入库脚本，核对 MySQL 行数与 Milvus 实体数
-4. 视需要跑一次 Milvus 检索烟测（不调 LLM）
+### Session 003
 
-## Blockers / Risks
-
-- [ ] config.ini 曾在会话中被改为 VibeQA 命名空间（root/VibeQA、RAGQA）：所有代码以**当前 config.ini 内容**为准，勿回滚旧值
-- [ ] 宿主 `python3`(3.14) 与项目 `.venv`(3.12) 分离：任何命令用 `uv run python`，勿直接 `python3`
-- [ ] 本目录非 git 仓库：无版本回退，破坏性变更前手动备份
-
-## Decisions Made
-
-- **配置单一权威 = config.ini**：`documents/data/config.ini`；`.env` 只承载 `DASHSCOPE_API_KEY` 一个密钥
-  - Context: 其余参数（host/账号/模型/检索）均已入 ini，避免两处漂移
-  - Alternatives considered: 全部经 pydantic-settings 从 .env 读取（已弃用，因重复且易歧义）
-- **Parent-Child 落库方式**：子块向量入库，父块文本冗余存于每行 `parent_text` 供检索期回取
-  - Context: 单 collection 免二次查询即可还原上下文，Milvus 标量检索成本可忽略
-  - Alternatives considered: 父子分两个 collection（更省存储但检索期多一跳）
-- **Schema 重建**：为加 `parent_text/doc_title/page` 字段，collection 需 drop 后重建（当前为空集，无数据损失）
-
-## Files Modified This Session
-
-- `CLAUDE.md` - 新建 harness 主指令
-- `feature_list.json` - 新建 feature 状态
-- `progress.md` - 本文件
-- `session-handoff.md` - 新建交接文档
-- `init.sh` - 新建验证脚本
-- `app/core/config.py` - 重写为解析 config.ini
-- `app/db/{mysql,redis,milvus}.py` - client 实现/Schema 增字段
-- `app/models/mysql_models.py` - ORM 表模型
-- `app/clients/dashscope.py` - 模型 client
-- `app/rag/document_loader.py` - 新建文档解析
-- `pyproject.toml`/`uv.lock` - 新增 pypdf/python-docx/tiktoken
-
-## Evidence of Completion
-
-- [x] Tests pass: `uv run python -m compileall -q app main.py` → 通过
-- [x] Type check clean: 无 TS；import 链 `uv run python -c "import app; app.create_app()"` → OK
-- [x] Manual verification: `mysql.ping()=True`；`milvus.get_store().ensure_collection()` 后 `has_collection=True`；config 解析=mysql VibeQA / collection RAGQA
-
-## Notes for Next Session
-
-- 续写 feat-004：chunker 与 ingestion 骨架已在脑中成型，直接落地即可；写完先 `uv run python -m compileall -q app` 再跑脚本
-- 入库脚本建议提供 `--subject ai`（ai_data 归属人工智能）与 `--reset`（drop 重建 collection + 清 documents 表）选项
-- Milvus 就绪判据 `curl -sf localhost:9091/healthz`；MySQL 管理员 root/mysqlroot
+- 日期：2026-09-08
+- 本轮目标：feat-004 语料入库——`documents/data/ai_data` → Parent-Child 分块 → DashScope 嵌入 → Milvus `VibeQA/RAGQA` + MySQL 记录
+- 已完成：
+  - 环境就绪：启动 Milvus（etcd+standalone）；MySQL 建库 `VibeQA`；Milvus schema 增 `parent_text`/`doc_title`/`page` 并重建（含 `drop_collection`）
+  - `app/rag/chunker.py`（父 1200/子 300/overlap 50）+ `app/services/ingestion.py`（嵌入自适应分批、`--reset`/`--dry-run`）；`document_loader.py` 实跑
+  - 入库结果：2 文档（pdf 11 页 + docx 大纲）→ 70 子块；MySQL subjects=5、documents=2（chunk_count 32+38）；Milvus row_count=70（flush 后）
+- 运行过的验证：compileall PASS；`mysql.ping()` True；`ensure_collection()` 后 has_collection True；E2E 检索「什么是大语言模型」命中 LLM 相关父块 score≈0.76
+- 已记录证据：MySQL/Milvus 行数与计数输出、检索烟测输出
+- 提交记录：无（本会话变更尚未提交）
+- 更新过的文件或工件：`app/rag/{chunker,document_loader}.py`、`app/services/ingestion.py`、`app/db/milvus.py`、`feature_list.json`（feat-004 completed）、`progress.md`
+- 已知风险或未解决问题：
+  - Milvus `get_collection_stats` 未 flush 时为 0，核对行数需先 `client.flush`
+  - 重跑入库需 `--reset` 防重复向量；在线嵌入/LLM 按量计费
+- 下一步最佳动作：开工 `feat-005` 检索编排与 RAG 问答——Milvus `search()` 命中按 `parent_chunk_id` 去重聚合、取 Top `candidate_m`，拼 TDD 5.2 模板 prompt → `dashscope.chat`/`achat_stream` 生成；完成后提交本会话变更并新增 Session 004 条目

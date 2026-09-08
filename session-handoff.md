@@ -2,9 +2,9 @@
 
 ## Current Objective
 
-- Goal: 完成 feat-004 语料入库 —— 把 `documents/data/ai_data` 解析→Parent-Child 分块→DashScope 嵌入→写入 Milvus(RAGQA) 并同步 MySQL
-- Current status: 环境与前置模块全部就绪，只差 chunker/ingestion 代码与执行；本会话应 `/harness-creator` 暂停了入库，先建了项目 harness
-- Branch / commit: 非 git 仓库，无分支
+- Goal: 上一目标 feat-004 语料入库已达成（ai_data 2 文档 → 70 子块 → VibeQA/RAGQA；MySQL subjects 5 + documents 2）。下一目标 = feat-005 检索编排与 RAG 问答。
+- Current status: feat-004 收尾验证通过（E2E 检索命中 LLM 相关父块）
+- Branch / commit: main @ 8cff070（首次提交）
 
 ## Completed This Session
 
@@ -47,4 +47,4 @@
 
 ## Recommended Next Step
 
-- 写 `app/rag/chunker.py` 与 `app/services/ingestion.py`，提供 `python -m app.services.ingestion --dir documents/data/ai_data --subject ai` 入口；`init_db()` 建表 + 种子 subjects 后入库，最后核对 MySQL 行数与 Milvus 实体数。
+- 开工 feat-005（检索编排/RAG 问答）：milvus `search()` 命中按 `parent_chunk_id` 去重聚合取 Top `candidate_m`，拼 TDD 5.2 模板 prompt → `dashscope.chat`/`achat_stream` 生成。上一 session 已把语料（70 子块）入库 VibeQA/RAGQA 并验证检索可用。
