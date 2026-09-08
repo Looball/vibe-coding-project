@@ -241,18 +241,19 @@ async function streamAsk(q) {
 
   const reader = resp.body.getReader();
   const dec = new TextDecoder();
-  let buf = "";
 
-  const handle = (raw) => {
-    let event = "message";
-    let data = "";
-    raw.split(/\r?\n/).forEach((line) => {
-      if (line.startsWith("event:")) event = line.slice(6).trim();
-      else if (line.startsWith("data:")) data += (data ? "\n" : "") + line.slice(5).trim();
-    });
+  // 逐行解析 SSE：事件以空行分隔（服务器用 CRLF），data 可能跨多行
+  let buf = "";
+  let current = { event: "message", lines: [] };
+
+  const dispatch = () => {
+    const data = current.lines.join("\n");
+    const event = current.event;
+    current = { event: "message", lines: [] };
     if (event === "sources") {
-      const list = JSON.parse(data || "[]");
-      if (list.length) {
+      let list = [];
+      try { list = JSON.parse(data || "[]"); } catch { list = []; }
+      if (list.length && !sourcesEl) {
         sourcesEl = el("div", "sources");
         list.forEach((s) =>
           sourcesEl.appendChild(
@@ -263,10 +264,26 @@ async function streamAsk(q) {
         messagesBox.scrollTop = messagesBox.scrollHeight;
       }
     } else if (event === "message") {
-      acc.push(data);
-      flushText();
+      if (data) { acc.push(data); flushText(); }
     } else if (event === "done") {
       cursor.remove();
+    }
+  };
+
+  const pump = () => {
+    let idx;
+    while ((idx = buf.indexOf("\n")) >= 0) {
+      let line = buf.slice(0, idx);
+      buf = buf.slice(idx + 1);
+      if (line.endsWith("\r")) line = line.slice(0, -1);
+      if (line === "") {
+        if (current.lines.length || current.event !== "message") dispatch();
+      } else if (line.startsWith("event:")) {
+        current.event = line.slice(6).trim();
+      } else if (line.startsWith("data:")) {
+        current.lines.push(line.slice(5).replace(/^ /, ""));
+      }
+      // 注释行(以":"开头)忽略
     }
   };
 
@@ -274,14 +291,11 @@ async function streamAsk(q) {
     const { done, value } = await reader.read();
     if (done) break;
     buf += dec.decode(value, { stream: true });
-    let sep;
-    while ((sep = buf.indexOf("\n\n")) >= 0) {
-      const raw = buf.slice(0, sep);
-      buf = buf.slice(sep + 2);
-      if (raw.trim()) handle(raw);
-    }
+    pump();
   }
-  if (buf.trim()) handle(buf);
+  buf += dec.decode(); // 冲刷多字节残留
+  pump();
+  if (current.lines.length || current.event !== "message") dispatch(); // 末尾无空行事件
   if (acc.length === 0) {
     cursor.remove();
     text.textContent = "(空回复)";
