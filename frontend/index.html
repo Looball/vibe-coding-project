@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>VibeQA · AI 智能问答</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- 顶部：品牌 + 学科选择 + 回答模式（PRD 2.2.4 学科过滤 / 2.2.2 交互方式） -->
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo">VibeQA</span>
+        <span class="sub">黑马程序员 · AI 智能问答</span>
+      </div>
+      <div class="top-actions">
+        <div id="subject-chips" class="chips" title="选择学科后提问更精准"></div>
+        <div class="mode">
+          <label class="seg"><input type="radio" name="mode" value="sync" checked><span>即时回答</span></label>
+          <label class="seg"><input type="radio" name="mode" value="stream"><span>流式回答</span></label>
+        </div>
+      </div>
+    </header>
+
+    <main class="layout">
+      <!-- 会话栏（PRD 2.1 会话管理） -->
+      <aside class="sidebar">
+        <div class="side-head">
+          <button id="btn-new" class="btn primary block">＋ 新会话</button>
+        </div>
+        <div id="conv-list" class="conv-list"></div>
+        <div class="side-foot">
+          <span id="health-dot" class="dot" title="后端状态"></span>
+          <span id="health-text">检测中…</span>
+        </div>
+      </aside>
+
+      <!-- 聊天区（PRD 3.2 会话界面） -->
+      <section class="chat">
+        <div id="messages" class="messages">
+          <div class="welcome">
+            <h2>你好，我是 AI 助教 👋</h2>
+            <p>选择上方学科，输入你的学习问题即可开始提问。</p>
+            <p class="hint">支持「即时回答」与逐字「流式回答」两种模式。</p>
+          </div>
+        </div>
+
+        <footer class="composer">
+          <textarea id="input" rows="1"
+            placeholder="输入问题，Enter 发送，Shift+Enter 换行"></textarea>
+          <button id="btn-send" class="btn send">发送</button>
+        </footer>
+        <div class="composer-tip" id="composer-tip"></div>
+      </section>
+    </main>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

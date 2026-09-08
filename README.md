@@ -49,6 +49,7 @@ uv run python -m app.services.ingestion --dir documents/data/ai_data --subject a
 ```bash
 uv run uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 # 交互文档: http://localhost:8000/docs
+# 前端页面: http://localhost:8000/  （frontend/，原生 SPA：学科选择/会话/即时+流式问答）
 ```
 
 ## API
